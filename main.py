@@ -144,8 +144,8 @@ def refresh_single_token(current_token, decryption_key):
     }
 
 def update_github_json(updated_db_content):
-    gh_token = "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"
-    url = "https://api.github.com/repos/junaidattari9267/Online-/contents/accounts.json"
+    gh_token = "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"
+    url = "https://api.github.com/repos/ganstarlucky71-ui/online/contents/accounts.json"
 
     headers = {
         "Authorization": f"Bearer {gh_token}",
