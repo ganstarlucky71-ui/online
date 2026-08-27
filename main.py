@@ -21,16 +21,26 @@ except ImportError:
     sys.exit()
 
 # ==========================================
-# 🛡️ GLOBAL PROXY SETTINGS (WebShare)
+# 🛡️ GLOBAL PROXY SETTINGS (Multi-Proxy Rotation)
 # ==========================================
-PROXY_HOST = "31.59.20.176"
-PROXY_PORT = 6754
-PROXY_USER = "elysxpfl"
-PROXY_PASS = "synto66j5f6h"
+PROXY_LIST = [
+    # Proxy 1 (Pehla Account - 50 connections dega)
+    {"host": "31.59.20.176", "port": 6754, "user": "elysxpfl", "pass": "synto66j5f6h"},
+    
+    # Proxy 2 (Jo tumne abhi di - Agle 50 connections dega)
+    {"host": "31.59.20.176", "port": 6754, "user": "uzyggtxh", "pass": "338nylzwbxsd"},
+    
+    # Proxy 3 (Baad me naya account banakar yahan add kar lena pure 170 ke liye)
+    # {"host": "IP", "port": PORT, "user": "USER", "pass": "PASS"},
+    
+    # Proxy 4 (Baad me naya account banakar yahan add kar lena)
+    # {"host": "IP", "port": PORT, "user": "USER", "pass": "PASS"}
+]
 
+# API requests ke liye default proxy (Pehli wali use karenge)
 HTTP_PROXIES = {
-    "http": f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}/",
-    "https": f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}/"
+    "http": f"http://{PROXY_LIST[0]['user']}:{PROXY_LIST[0]['pass']}@{PROXY_LIST[0]['host']}:{PROXY_LIST[0]['port']}/",
+    "https": f"http://{PROXY_LIST[0]['user']}:{PROXY_LIST[0]['pass']}@{PROXY_LIST[0]['host']}:{PROXY_LIST[0]['port']}/"
 }
 
 # ==========================================
@@ -43,7 +53,7 @@ GLOBAL_DYNAMIC_ROOM = None
 @app.route('/')
 def home():
     current = GLOBAL_DYNAMIC_ROOM if GLOBAL_DYNAMIC_ROOM else "Default rooms.txt"
-    return f"🚀 Mega Bot is Live! <br>Current Target Room: {current} <br>(Online Viewer + Dynamic Shift + PROXY ENABLED)"
+    return f"🚀 Mega Bot is Live! <br>Current Target Room: {current} <br>(Online Viewer + Dynamic Shift + MULTI-PROXY ENABLED)"
 
 @app.route('/change_room')
 def change_room_api():
@@ -116,7 +126,6 @@ def refresh_single_token(current_token, decryption_key):
     data = {'app': 'olaparty', 's_t': s_t_old, 'uid': uid, 'c_auth': c_auth, 'appId': 'ikxd'}
     
     try:
-        # API Calls using PROXY
         response = requests.post(url, data=data, headers=headers, proxies=HTTP_PROXIES, timeout=15)
         res_json = response.json()
         data_node = res_json.get("data", {})
@@ -144,7 +153,9 @@ def refresh_single_token(current_token, decryption_key):
     }
 
 def update_github_json(updated_db_content):
+    # Tumhara Naya GitHub Token
     gh_token = "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"
+    # Tumhara Naya GitHub URL
     url = "https://api.github.com/repos/ganstarlucky71-ui/online/contents/accounts.json"
 
     headers = {
@@ -152,7 +163,6 @@ def update_github_json(updated_db_content):
         "Accept": "application/vnd.github.v3+json"
     }
 
-    # Github updates using PROXY
     res = requests.get(url, headers=headers, proxies=HTTP_PROXIES)
     if res.status_code != 200:
         print("❌ GitHub se accounts.json nahi mil rhi!")
@@ -312,6 +322,13 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
         threading.Thread(target=run, daemon=True).start()
 
     def connect_ws():
+        # 🔥 Har bot ko uske number ke hisaab se proxy assign hogi (Rotating System) 🔥
+        my_proxy = PROXY_LIST[(bot_num - 1) % len(PROXY_LIST)]
+        P_HOST = my_proxy["host"]
+        P_PORT = my_proxy["port"]
+        P_USER = my_proxy["user"]
+        P_PASS = my_proxy["pass"]
+
         while True:
             current_token = account_ref.get("token", "").strip()
             headers = {
@@ -322,7 +339,6 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
                 "X-Auth-Token": current_token
             }
             
-            # 🔥 Error reporting for debugging proxy issues 🔥
             def on_ws_error(ws, error):
                 print(f"❌ [Bot {bot_num}] Connection Error: {error}")
                 
@@ -338,12 +354,11 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
                 on_close=on_ws_close
             )
             
-            # Proxy settings built into the websocket runner
             ws.run_forever(
                 sslopt={"cert_reqs": ssl.CERT_NONE},
-                http_proxy_host=PROXY_HOST,
-                http_proxy_port=PROXY_PORT,
-                http_proxy_auth=(PROXY_USER, PROXY_PASS),
+                http_proxy_host=P_HOST,
+                http_proxy_port=P_PORT,
+                http_proxy_auth=(P_USER, P_PASS),
                 proxy_type="http"
             )
             time.sleep(4) 
@@ -356,7 +371,7 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     print("==================================================")
-    print("🔥 MEGA BOT: VIEWER ONLY + PROXY + TERMUX DYNAMIC 🔥")
+    print("🔥 MEGA BOT: VIEWER ONLY + MULTI-PROXY ENABLED 🔥")
     print("==================================================")
 
     # 1. Start Web Server
@@ -390,8 +405,8 @@ def main():
     # 3. Start Background Token Refresher Thread (Har 12 Ghante)
     threading.Thread(target=background_token_refresher, daemon=True).start()
 
-    # 4. Start Bots (⚠️ Testing ke liye filhal max 5 accounts chalayenge)
-    tokens_per_room = 200 # <-- Test pass hone ke baad isko wapas 170 kar lena
+    # 4. Start Bots
+    tokens_per_room = 200 # Target is to run all accounts
     bot_counter = 1
 
     print(f"📂 Total Accounts: {len(accounts_list)} | Total Rooms: {len(rooms)}")
@@ -413,8 +428,8 @@ def main():
         for acc in current_room_accounts:
             run_single_bot(bot_counter, acc, room_id)
             bot_counter += 1
-            # ⚠️ Thoda ruk-ruk kar bhejenge taaki Proxy hang na ho
-            time.sleep(3)
+            # ⚠️ 5 sec ka gap de diya taaki proxy connection time le sake
+            time.sleep(5)
 
     print("\n✅ All Bots deployment logic started!")
     print("⏳ Running continuously... Don't close this terminal.")
