@@ -154,7 +154,7 @@ def refresh_single_token(current_token, decryption_key):
 
 def update_github_json(updated_db_content):
     # Tumhara Naya GitHub Token
-    gh_token = "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"
+    gh_token = "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"
     # Tumhara Naya GitHub URL
     url = "https://api.github.com/repos/ganstarlucky71-ui/online/contents/accounts.json"
 
