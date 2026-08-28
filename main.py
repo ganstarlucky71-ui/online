@@ -21,47 +21,28 @@ except ImportError:
     sys.exit()
 
 # ==========================================
-# 🛡️ GLOBAL PROXY SETTINGS (Multi-Proxy Rotation)
-# ==========================================
-PROXY_LIST = [
-    # Proxy 1 (Pehla Account - 50 connections dega)
-    {"host": "31.59.20.176", "port": 6754, "user": "elysxpfl", "pass": "synto66j5f6h"},
-    
-    # Proxy 2 (Jo tumne abhi di - Agle 50 connections dega)
-    {"host": "31.59.20.176", "port": 6754, "user": "uzyggtxh", "pass": "338nylzwbxsd"},
-    
-    # Proxy 3 (Baad me naya account banakar yahan add kar lena pure 170 ke liye)
-    # {"host": "IP", "port": PORT, "user": "USER", "pass": "PASS"},
-    
-    # Proxy 4 (Baad me naya account banakar yahan add kar lena)
-    # {"host": "IP", "port": PORT, "user": "USER", "pass": "PASS"}
-]
-
-# API requests ke liye default proxy (Pehli wali use karenge)
-HTTP_PROXIES = {
-    "http": f"http://{PROXY_LIST[0]['user']}:{PROXY_LIST[0]['pass']}@{PROXY_LIST[0]['host']}:{PROXY_LIST[0]['port']}/",
-    "https": f"http://{PROXY_LIST[0]['user']}:{PROXY_LIST[0]['pass']}@{PROXY_LIST[0]['host']}:{PROXY_LIST[0]['port']}/"
-}
-
-# ==========================================
 # 🌐 1. FLASK SERVER & DYNAMIC ROOM API
 # ==========================================
 app = Flask(__name__)
 
+# 🔥 Naya Global Variable Temporary Room ke liye (Memory me save hoga, GitHub me nahi)
 GLOBAL_DYNAMIC_ROOM = None 
 
 @app.route('/')
 def home():
     current = GLOBAL_DYNAMIC_ROOM if GLOBAL_DYNAMIC_ROOM else "Default rooms.txt"
-    return f"🚀 Mega Bot is Live! <br>Current Target Room: {current} <br>(Online Viewer + Dynamic Shift + MULTI-PROXY ENABLED)"
+    return f"🚀 Mega Bot is Live! <br>Current Target Room: {current} <br>(Online Viewer + Dynamic Shift + 12H Auto-Restart Sync)"
 
 @app.route('/change_room')
 def change_room_api():
     global GLOBAL_DYNAMIC_ROOM
     new_room = request.args.get('cid')
+    action = request.args.get('action')
+    
     if new_room and new_room.startswith("C_"):
         GLOBAL_DYNAMIC_ROOM = new_room
-        return f"✅ SUCCESS: Server memory update ho gayi! Sabhi bots ab bina restart hue {new_room} me shift ho jayenge."
+        action_msg = " + AUTO TAKE SEAT" if action == "take_seat" else ""
+        return f"✅ SUCCESS: Server memory update ho gayi! Sabhi bots ab bina restart hue {new_room} me shift ho jayenge{action_msg}."
     return "❌ ERROR: Ghalat Room ID."
 
 def keep_alive():
@@ -69,7 +50,7 @@ def keep_alive():
     app.run(host='0.0.0.0', port=port, use_reloader=False)
 
 # ==========================================
-# 🔐 2. TOKEN REFRESHER & GITHUB SYNC LOGIC
+# 🔐 2. TOKEN REFRESHER & GITHUB SYNC LOGIC (Sirf accounts.json ke liye)
 # ==========================================
 IV = b'01234567'
 GLOBAL_ACCOUNTS_DB = {} 
@@ -126,7 +107,7 @@ def refresh_single_token(current_token, decryption_key):
     data = {'app': 'olaparty', 's_t': s_t_old, 'uid': uid, 'c_auth': c_auth, 'appId': 'ikxd'}
     
     try:
-        response = requests.post(url, data=data, headers=headers, proxies=HTTP_PROXIES, timeout=15)
+        response = requests.post(url, data=data, headers=headers, timeout=10)
         res_json = response.json()
         data_node = res_json.get("data", {})
         s_session = res_json.get("s_session") or data_node.get("s_session")
@@ -153,9 +134,7 @@ def refresh_single_token(current_token, decryption_key):
     }
 
 def update_github_json(updated_db_content):
-    # Tumhara Naya GitHub Token
     gh_token = "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"
-    # Tumhara Naya GitHub URL
     url = "https://api.github.com/repos/ganstarlucky71-ui/online/contents/accounts.json"
 
     headers = {
@@ -163,7 +142,7 @@ def update_github_json(updated_db_content):
         "Accept": "application/vnd.github.v3+json"
     }
 
-    res = requests.get(url, headers=headers, proxies=HTTP_PROXIES)
+    res = requests.get(url, headers=headers)
     if res.status_code != 200:
         print("❌ GitHub se accounts.json nahi mil rhi!")
         return
@@ -177,7 +156,7 @@ def update_github_json(updated_db_content):
         "sha": sha
     }
 
-    upload_res = requests.put(url, headers=headers, json=payload, proxies=HTTP_PROXIES)
+    upload_res = requests.put(url, headers=headers, json=payload)
     if upload_res.status_code == 200 or upload_res.status_code == 201:
         print("☁️ ✅ GitHub par accounts.json successfully update ho gayi! Render will restart now.")
     else:
@@ -185,8 +164,11 @@ def update_github_json(updated_db_content):
 
 def background_token_refresher():
     while True:
-        print("⏳ [AUTO-REFRESH] Timer Started. Agla refresh theek 12 ghante baad hoga...")
-        time.sleep(43200) # 12 Ghante ka wait
+        print("\n⏳ [AUTO-REFRESH] Timer Started. Agla refresh theek 12 ghante baad hoga...")
+        # Smart timer for logging to avoid render restart silences
+        for hour in range(1, 13):
+            time.sleep(3600)  # 1 Ghanta wait
+            print(f"⏳ [AUTO-REFRESH] {hour} Ghante (Hours) guzar gaye...")
 
         print("\n🔄 [AUTO-REFRESH] 12 Hours Completed! Token Refresh Cycle Started...")
         accounts = GLOBAL_ACCOUNTS_DB.get("accountInfos", [])
@@ -250,6 +232,7 @@ def cid_to_varint_hex(cid_str, target_length=5):
 def determine_version(room_id):
     return "V1" if "_V1_" in room_id else "V2"
 
+# 🟢 V1 Packets (Entry & Seat)
 def get_v1_enter_packet(room_id):
     id_bytes = room_id.encode('utf-8')
     id_len = encode_varint(len(id_bytes))
@@ -260,6 +243,24 @@ def get_v1_enter_packet(room_id):
     inner_payload = inner_prefix + id_len + id_bytes + inner_suffix
     return p1 + id_len + id_bytes + p2 + encode_varint(len(inner_payload)) + inner_payload + bytes.fromhex("1000")
 
+def get_v1_sit_packet(room_id, seat_number):
+    room_bytes = room_id.encode('utf-8')
+    room_len_varint = encode_varint(len(room_bytes))
+    time_ms = int(time.time() * 1000)
+    time_bytes_raw = encode_varint(time_ms)
+    
+    prefix = bytes.fromhex("50001800621D0A06582D506369641213313135323932313530343631323830323734392205656E5F6E703A0F4368616E6E656C2E536974646F776E4801")
+    route_suffix = bytes.fromhex("0A196E65742E696861676F2E6368616E6E656C2E7372762E6D67724205302E302E30")
+    routing_inner = prefix + bytes.fromhex("32") + room_len_varint + room_bytes + bytes.fromhex("10") + time_bytes_raw + route_suffix
+    chunk_routing = bytes.fromhex("0A") + encode_varint(len(routing_inner)) + routing_inner
+    
+    seat_varint = encode_varint(seat_number)
+    payload_inner = bytes.fromhex("0A") + room_len_varint + room_bytes + bytes.fromhex("10") + seat_varint
+    chunk_payload = bytes.fromhex("1A") + encode_varint(len(payload_inner)) + payload_inner
+    
+    return chunk_routing + chunk_payload + bytes.fromhex("1000")
+
+# 🟢 V2 Packets (Entry & Seat)
 def get_v2_enter_packet(room_id):
     new_id_hex = room_id.encode('utf-8').hex()
     new_len_hex = format(len(room_id), '02x')
@@ -267,6 +268,14 @@ def get_v2_enter_packet(room_id):
     middle = "1087F0A7DDBC330A196E65742E696861676F2E6368616E6E656C2E7372762E6D67724205302E302E301AC0049802000A"
     suffix = "721C120231351A07616172636836340A0A3233313144524B34384928CD585A00AA02360A1D1A0761617263683634100828F0BBCC0120C0A386010A064D543638393722065869616F6D691A0A3233313144524B34384910CD58FA012D0A002200520231335A022D3162022D311219313736383634383437323536343138373932393039373133331A008A0206080018001000A002005200F001001A8302DA0201319A070131320131E807005A030A0131B8060160009002010A0131FA030131900500F2030131C00700C80700D0070050011801C80200900301F80101C00601980281A004F00601A80600EA0601318A05061201310A0131AA080131E00301A00101B80801A80501C80800C00801800201A0050182040131EA030131B004019805012A0131A80700980300A801012001B80401980800B2010131900800120131A00401900400880401B00601DA060131D00601B00800C80601F8060082050131F00101D20233980200900300A80100800200800500A80500900200D80300980300F80100B00100E80100A001000A0131880200E00100D801006800E00201880201100B82017318004000120E4D6163204F53202841646D696E293000200128000A5768747470733A2F2F6F2D696E2E6F6C6170617274792E636F6D2F626C6F622F76322F616C692F696E2F302F312F6E732F323176353870792F7575726C2F343436363334333532365F313736353232343230362E6A7065679002001000"
     return bytes.fromhex(f"{prefix}{new_len_hex}{new_id_hex}{middle}{new_len_hex}{new_id_hex}{suffix}")
+
+def get_v2_sit_packet(room_id):
+    id_hex = room_id.encode('utf-8').hex()
+    len_hex = format(len(room_id), '02x')
+    prefix = "0A880150001800621D0A06582D506369641213313135323932313530343631323830323734392205656E5F696E3A0F4368616E6E656C2E536974646F776E480132"
+    middle = "109DCBFD96C3330A196E65742E696861676F2E6368616E6E656C2E7372762E6D67724205302E302E301A2D0A"
+    suffix = "10FFFFFFFFFFFFFFFFFF011000"
+    return bytes.fromhex(f"{prefix}{len_hex}{id_hex}{middle}{len_hex}{id_hex}{suffix}")
 
 def generate_heartbeat_packet(target_cid):
     target_cid_clean = target_cid.strip()
@@ -291,7 +300,7 @@ def generate_heartbeat_packet(target_cid):
     return bytes.fromhex(base_hex.replace(" ", ""))
 
 # ==========================================
-# 🤖 4. BOT WORKER (Dynamic Room Shift System)
+# 🤖 4. BOT WORKER (Dynamic Room Shift + Take Seat System)
 # ==========================================
 def run_single_bot(bot_num, account_ref, original_room_cid):
     def on_open(ws):
@@ -300,20 +309,40 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
             r_version = determine_version(current_room)
             
             try:
+                # 1. PEHLI BAAR ENTER ROOM (Jo rooms.txt me hai)
                 ws.send(get_v1_enter_packet(current_room) if r_version == "V1" else get_v2_enter_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
                 time.sleep(1)
+                
                 print(f"✅ [Bot {bot_num}] Assigned to Room: {current_room}")
 
+                # 2. HEARTBEAT LOOP & DYNAMIC ROOM CHECK (Har 40 seconds)
                 while True:
                     time.sleep(40)
+                    
+                    # 🔥 Check if Room was dynamically changed via Termux
                     target_room = GLOBAL_DYNAMIC_ROOM if GLOBAL_DYNAMIC_ROOM else original_room_cid
+                    
+                    # Agar naya room mila, toh shift ho jao aur seat lo!
                     if current_room != target_room:
                         print(f"🚀 [Bot {bot_num}] Shifting to NEW Room: {target_room}")
                         current_room = target_room
                         r_version = determine_version(current_room)
+                        
+                        # Step A: Naye room me enter packet bhejo
                         ws.send(get_v1_enter_packet(current_room) if r_version == "V1" else get_v2_enter_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
-                        time.sleep(1)
+                        time.sleep(1) # Entry ke baad 1 sec ruko
+                        
+                        # Step B: Naye room me aate hi TAKE SEAT (Baith jao)
+                        if r_version == "V1":
+                            for seat in range(2, 13):
+                                ws.send(get_v1_sit_packet(current_room, seat), opcode=websocket.ABNF.OPCODE_BINARY)
+                                time.sleep(0.05) # V1 me sab seat par apply karo
+                        else:
+                            ws.send(get_v2_sit_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
+                            
+                        print(f"🪑 [Bot {bot_num}] Ne naye room me Seat le li hai!")
                     
+                    # Heartbeat hamesha usi room me bhejega jisme abhi khada hai
                     ws.send(generate_heartbeat_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
 
             except Exception: pass
@@ -322,13 +351,6 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
         threading.Thread(target=run, daemon=True).start()
 
     def connect_ws():
-        # 🔥 Har bot ko uske number ke hisaab se proxy assign hogi (Rotating System) 🔥
-        my_proxy = PROXY_LIST[(bot_num - 1) % len(PROXY_LIST)]
-        P_HOST = my_proxy["host"]
-        P_PORT = my_proxy["port"]
-        P_USER = my_proxy["user"]
-        P_PASS = my_proxy["pass"]
-
         while True:
             current_token = account_ref.get("token", "").strip()
             headers = {
@@ -338,29 +360,8 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
                 "X-App-Ver": "50800",
                 "X-Auth-Token": current_token
             }
-            
-            def on_ws_error(ws, error):
-                print(f"❌ [Bot {bot_num}] Connection Error: {error}")
-                
-            def on_ws_close(ws, close_code, close_msg):
-                print(f"🔌 [Bot {bot_num}] Connection Closed")
-
-            ws = websocket.WebSocketApp(
-                "wss://i-875.olaparty.com/ikxd_cproxy", 
-                header=headers, 
-                on_open=on_open, 
-                on_message=lambda w,m:None, 
-                on_error=on_ws_error, 
-                on_close=on_ws_close
-            )
-            
-            ws.run_forever(
-                sslopt={"cert_reqs": ssl.CERT_NONE},
-                http_proxy_host=P_HOST,
-                http_proxy_port=P_PORT,
-                http_proxy_auth=(P_USER, P_PASS),
-                proxy_type="http"
-            )
+            ws = websocket.WebSocketApp("wss://i-875.olaparty.com/ikxd_cproxy", header=headers, on_open=on_open, on_message=lambda w,m:None, on_error=lambda w,e:None, on_close=lambda w,c,m:None)
+            ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
             time.sleep(4) 
 
     threading.Thread(target=connect_ws, daemon=True).start()
@@ -371,7 +372,7 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     print("==================================================")
-    print("🔥 MEGA BOT: VIEWER ONLY + MULTI-PROXY ENABLED 🔥")
+    print("🔥 MEGA BOT: VIEWER + TERMUX SHIFT + AUTO SEAT 🔥")
     print("==================================================")
 
     # 1. Start Web Server
@@ -406,7 +407,7 @@ def main():
     threading.Thread(target=background_token_refresher, daemon=True).start()
 
     # 4. Start Bots
-    tokens_per_room = 200 # Target is to run all accounts
+    tokens_per_room = 97
     bot_counter = 1
 
     print(f"📂 Total Accounts: {len(accounts_list)} | Total Rooms: {len(rooms)}")
@@ -423,15 +424,14 @@ def main():
         if not current_room_accounts:
             continue
 
-        print(f"\n🚀 Deploying bots to Room: {room_id}...")
+        print(f"\n🚀 Deploying {len(current_room_accounts)} bots to Room: {room_id}...")
 
         for acc in current_room_accounts:
             run_single_bot(bot_counter, acc, room_id)
             bot_counter += 1
-            # ⚠️ 5 sec ka gap de diya taaki proxy connection time le sake
-            time.sleep(5)
+            time.sleep(0.3)
 
-    print("\n✅ All Bots deployment logic started!")
+    print("\n✅ All Bots deployed! Termux shift system is active.")
     print("⏳ Running continuously... Don't close this terminal.")
 
     while True:
