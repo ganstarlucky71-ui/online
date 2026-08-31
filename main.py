@@ -38,7 +38,7 @@ def change_room_api():
     global GLOBAL_DYNAMIC_ROOM
     new_room = request.args.get('cid')
     action = request.args.get('action')
-
+    
     if new_room and new_room.startswith("C_"):
         GLOBAL_DYNAMIC_ROOM = new_room
         action_msg = " + AUTO TAKE SEAT" if action == "take_seat" else ""
@@ -50,7 +50,7 @@ def keep_alive():
     app.run(host='0.0.0.0', port=port, use_reloader=False)
 
 # ==========================================
-# 🔐 2. TOKEN REFRESHER & GITHUB SYNC LOGIC
+# 🔐 2. TOKEN REFRESHER & GITHUB SYNC LOGIC (Sirf accounts.json ke liye)
 # ==========================================
 IV = b'01234567'
 GLOBAL_ACCOUNTS_DB = {} 
@@ -80,13 +80,13 @@ def refresh_single_token(current_token, decryption_key):
     device_id = generate_random_hdid()
     decoded_token = unquote(current_token)
     parts = decoded_token.split(',')
-
+    
     if len(parts) < 2: return None
     c_auth, s_t_old = parts[0], parts[1]
 
     decrypted_payload = decrypt_des_ede(c_auth, decryption_key)
     if not decrypted_payload: return None
-
+    
     try:
         uid = json.loads(decrypted_payload).get("uuid")
     except: return None
@@ -105,7 +105,7 @@ def refresh_single_token(current_token, decryption_key):
         'x-olaparty-ver': '11800'
     }
     data = {'app': 'olaparty', 's_t': s_t_old, 'uid': uid, 'c_auth': c_auth, 'appId': 'ikxd'}
-
+    
     try:
         response = requests.post(url, data=data, headers=headers, timeout=10)
         res_json = response.json()
@@ -117,7 +117,7 @@ def refresh_single_token(current_token, decryption_key):
 
     decrypted_session_json = decrypt_des_ede(s_session, decryption_key)
     if not decrypted_session_json: return None
-
+    
     try:
         session_data = json.loads(decrypted_session_json)
         new_uuid = session_data.get("uuid")
@@ -127,14 +127,13 @@ def refresh_single_token(current_token, decryption_key):
     timestamp = int(time.time() * 1000)
     new_payload_json = json.dumps({"uuid": new_uuid, "timestamp": timestamp}, separators=(',', ':'))
     encrypted_part1 = encrypt_des_ede(new_payload_json, new_session_key)
-
+    
     return {
         "new_token": quote(f"{encrypted_part1},{s_t_new}", safe=''),
         "new_session_key": new_session_key
     }
 
 def update_github_json(updated_db_content):
-    # Tumhara Token aur Repo ka link
     gh_token = "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"
     url = "https://api.github.com/repos/ganstarlucky71-ui/online/contents/accounts.json"
 
@@ -143,17 +142,11 @@ def update_github_json(updated_db_content):
         "Accept": "application/vnd.github.v3+json"
     }
 
-    print("☁️ [GITHUB] Purani file ka data check kar rahe hain...")
     res = requests.get(url, headers=headers)
-
     if res.status_code != 200:
-        print(f"❌ GitHub GET Error: {res.status_code} - {res.text}")
+        print("❌ GitHub se accounts.json nahi mil rhi!")
         return
-
     sha = res.json().get("sha")
-    if not sha:
-        print("❌ GitHub se SHA code nahi mila!")
-        return
 
     content_encoded = base64.b64encode(json.dumps(updated_db_content, separators=(',', ':')).encode()).decode()
 
@@ -163,75 +156,47 @@ def update_github_json(updated_db_content):
         "sha": sha
     }
 
-    print("☁️ [GITHUB] Nayi file upload ki ja rahi hai...")
     upload_res = requests.put(url, headers=headers, json=payload)
     if upload_res.status_code == 200 or upload_res.status_code == 201:
-        print("☁️ ✅ GitHub par accounts.json successfully update ho gayi! (Iske baad Render shayad restart hoga)")
+        print("☁️ ✅ GitHub par accounts.json successfully update ho gayi! Render will restart now.")
     else:
-        print(f"☁️ ❌ GitHub upload failed: {upload_res.status_code} - {upload_res.text}")
+        print(f"☁️ ❌ GitHub upload failed: {upload_res.text}")
 
 def background_token_refresher():
-    print("\n⏳ [AUTO-REFRESH] Advance Refresher Started...")
-
     while True:
-        try:
-            # 1. Check Aakhri update kab hua tha (Local JSON se)
-            accounts = GLOBAL_ACCOUNTS_DB.get("accountInfos", [])
-            if not accounts:
-                time.sleep(60)
-                continue
+        print("\n⏳ [AUTO-REFRESH] Timer Started. Agla refresh theek 12 ghante baad hoga...")
+        # Smart timer for logging to avoid render restart silences
+        for hour in range(1, 13):
+            time.sleep(3600)  # 1 Ghanta wait
+            print(f"⏳ [AUTO-REFRESH] {hour} Ghante (Hours) guzar gaye...")
 
-            # Pehle account ka timestamp check karte hain
-            first_acc = accounts[0]
-            last_timestamp = first_acc.get("localTimestamp", 0)
-            current_time = int(time.time() * 1000) # Milliseconds
+        print("\n🔄 [AUTO-REFRESH] 12 Hours Completed! Token Refresh Cycle Started...")
+        accounts = GLOBAL_ACCOUNTS_DB.get("accountInfos", [])
 
-            # 12 Hours = 43,200,000 milliseconds
-            time_difference = current_time - last_timestamp
-
-            if time_difference >= 43200000:
-                print(f"\n🔄 [AUTO-REFRESH] 12 Ghante guzar chuke hain! Tokens Refresh shuru ho raha hai...")
-
-                def worker(acc):
-                    old_token = acc.get("token")
-                    old_session = acc.get("sessionKey")
-                    result = refresh_single_token(old_token, old_session)
-                    if result:
-                        acc["token"] = result["new_token"]
-                        acc["sessionKey"] = result["new_session_key"]
-                        acc["localTimestamp"] = int(time.time() * 1000)
-                        print(f"✅ Auto-Refreshed: {acc.get('userName')}")
-                    else:
-                        print(f"❌ Auto-Refresh Failed: {acc.get('userName')}")
-
-                # Saare accounts update karo
-                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                    executor.map(worker, accounts)
-
-                # Update hone ke baad File ko save aur upload karo
-                try:
-                    with open("accounts.json", "w", encoding="utf-8") as f:
-                        json.dump(GLOBAL_ACCOUNTS_DB, f, separators=(',', ':'))
-                    print("📁 [AUTO-REFRESH] Local 'accounts.json' successfully save ho gayi!")
-
-                    # GitHub par upload!
-                    update_github_json(GLOBAL_ACCOUNTS_DB)
-
-                except Exception as e:
-                    print(f"❌ File Save Error: {e}")
-
+        def worker(acc):
+            old_token = acc.get("token")
+            old_session = acc.get("sessionKey")
+            result = refresh_single_token(old_token, old_session)
+            if result:
+                acc["token"] = result["new_token"]
+                acc["sessionKey"] = result["new_session_key"]
+                acc["localTimestamp"] = int(time.time() * 1000)
+                print(f"✅ Auto-Refreshed: {acc.get('userName')}")
             else:
-                # Agar 12 ghante nahi hue, toh kitna time bacha hai wo batayega (Har 1 ghante me update dega)
-                hours_left = (43200000 - time_difference) / (1000 * 60 * 60)
-                print(f"⏳ [AUTO-REFRESH] Agla refresh {hours_left:.1f} ghante baad hoga.")
+                print(f"❌ Auto-Refresh Failed: {acc.get('userName')}")
 
-            # Ye loop har 1 ghante (3600 sec) me check karega ki time hua ya nahi
-            # Isse agar server sleep/restart ho jaye, toh koi issue nahi hoga!
-            time.sleep(3600)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            executor.map(worker, accounts)
+
+        try:
+            with open("accounts.json", "w", encoding="utf-8") as f:
+                json.dump(GLOBAL_ACCOUNTS_DB, f, separators=(',', ':'))
+            print("📁 [AUTO-REFRESH] Local 'accounts.json' updated!")
+
+            update_github_json(GLOBAL_ACCOUNTS_DB)
 
         except Exception as e:
-            print(f"❌ Refresher Loop Error: {e}")
-            time.sleep(600) # Error aane par 10 min rukega
+            print(f"❌ File Save Error: {e}")
 
 # ==========================================
 # 📡 3. HEX PACKETS GENERATOR (Bots ke liye)
@@ -283,16 +248,16 @@ def get_v1_sit_packet(room_id, seat_number):
     room_len_varint = encode_varint(len(room_bytes))
     time_ms = int(time.time() * 1000)
     time_bytes_raw = encode_varint(time_ms)
-
+    
     prefix = bytes.fromhex("50001800621D0A06582D506369641213313135323932313530343631323830323734392205656E5F6E703A0F4368616E6E656C2E536974646F776E4801")
     route_suffix = bytes.fromhex("0A196E65742E696861676F2E6368616E6E656C2E7372762E6D67724205302E302E30")
     routing_inner = prefix + bytes.fromhex("32") + room_len_varint + room_bytes + bytes.fromhex("10") + time_bytes_raw + route_suffix
     chunk_routing = bytes.fromhex("0A") + encode_varint(len(routing_inner)) + routing_inner
-
+    
     seat_varint = encode_varint(seat_number)
     payload_inner = bytes.fromhex("0A") + room_len_varint + room_bytes + bytes.fromhex("10") + seat_varint
     chunk_payload = bytes.fromhex("1A") + encode_varint(len(payload_inner)) + payload_inner
-
+    
     return chunk_routing + chunk_payload + bytes.fromhex("1000")
 
 # 🟢 V2 Packets (Entry & Seat)
@@ -342,31 +307,31 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
         def run():
             current_room = original_room_cid
             r_version = determine_version(current_room)
-
+            
             try:
                 # 1. PEHLI BAAR ENTER ROOM (Jo rooms.txt me hai)
                 ws.send(get_v1_enter_packet(current_room) if r_version == "V1" else get_v2_enter_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
                 time.sleep(1)
-
+                
                 print(f"✅ [Bot {bot_num}] Assigned to Room: {current_room}")
 
                 # 2. HEARTBEAT LOOP & DYNAMIC ROOM CHECK (Har 40 seconds)
                 while True:
                     time.sleep(40)
-
+                    
                     # 🔥 Check if Room was dynamically changed via Termux
                     target_room = GLOBAL_DYNAMIC_ROOM if GLOBAL_DYNAMIC_ROOM else original_room_cid
-
+                    
                     # Agar naya room mila, toh shift ho jao aur seat lo!
                     if current_room != target_room:
                         print(f"🚀 [Bot {bot_num}] Shifting to NEW Room: {target_room}")
                         current_room = target_room
                         r_version = determine_version(current_room)
-
+                        
                         # Step A: Naye room me enter packet bhejo
                         ws.send(get_v1_enter_packet(current_room) if r_version == "V1" else get_v2_enter_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
                         time.sleep(1) # Entry ke baad 1 sec ruko
-
+                        
                         # Step B: Naye room me aate hi TAKE SEAT (Baith jao)
                         if r_version == "V1":
                             for seat in range(2, 13):
@@ -374,9 +339,9 @@ def run_single_bot(bot_num, account_ref, original_room_cid):
                                 time.sleep(0.05) # V1 me sab seat par apply karo
                         else:
                             ws.send(get_v2_sit_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
-
+                            
                         print(f"🪑 [Bot {bot_num}] Ne naye room me Seat le li hai!")
-
+                    
                     # Heartbeat hamesha usi room me bhejega jisme abhi khada hai
                     ws.send(generate_heartbeat_packet(current_room), opcode=websocket.ABNF.OPCODE_BINARY)
 
